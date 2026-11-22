@@ -17,7 +17,10 @@ migrations_dir = "cloudflare/migrations"
 ACCESS_ISSUER = "https://green-scene-7051.cloudflareaccess.com"
 ACCESS_AUD = "b5c7349aa78d672522b9735ab61b9efd81792889bac22c9064a3b3cbf55bcebe"
 ALLOWED_ORIGIN = "https://hellocatgroup.github.io"
-ADMIN_PAGE_URL = "https://hellocatgroup.github.io/hellocat.github.io/admin/"
+ADMIN_ORIGIN = "https://hello-cat-downloads-api.z0ovd.workers.dev"
+ADMIN_SOURCE_URL = "https://hellocatgroup.github.io/hellocat.github.io/admin/app.html"
+ADMIN_ASSET_BASE_URL = "https://hellocatgroup.github.io/hellocat.github.io/"
+ADMIN_APP_URL = "https://hello-cat-downloads-api.z0ovd.workers.dev/admin/"
 MAX_UPLOAD_BYTES = "94371840"
 
 [observability]

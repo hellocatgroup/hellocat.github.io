@@ -1,0 +1,23 @@
+name = "hello-cat-downloads-api"
+main = "worker/index.js"
+compatibility_date = "2026-11-22"
+workers_dev = false
+
+routes = [
+  { pattern = "helloc.at/api/*", zone_name = "helloc.at" }
+]
+
+[[r2_buckets]]
+binding = "FILES_BUCKET"
+bucket_name = "hello-cat-downloads"
+
+[[d1_databases]]
+binding = "FILES_DB"
+database_name = "hello-cat-downloads"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "cloudflare/migrations"
+
+[vars]
+ACCESS_ISSUER = "https://REPLACE_WITH_TEAM_NAME.cloudflareaccess.com"
+ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD"
+MAX_UPLOAD_BYTES = "104857600"

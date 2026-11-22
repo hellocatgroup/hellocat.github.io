@@ -103,7 +103,7 @@ The Worker variables in `wrangler.toml` are already set for the current GitHub P
 
 - `ALLOWED_ORIGIN = "https://hellocatgroup.github.io"`
 - `ADMIN_PAGE_URL = "https://hellocatgroup.github.io/hellocat.github.io/admin/"`
-- `MAX_UPLOAD_BYTES = "104857600"`
+- `MAX_UPLOAD_BYTES = "94371840"`
 
 The origin intentionally contains only the scheme and hostname; it does not include the repository path. The admin return URL includes the full project-site path.
 
@@ -143,5 +143,5 @@ Then upload a small harmless test file, verify it appears on the downloads page,
 - The static GitHub Pages admin shell is public in this deployment, but privileged controls remain hidden until the API confirms authorization. No file-management action is trusted to frontend visibility alone.
 - Public file listing contains published files only. Unpublished files cannot be downloaded through the public endpoint.
 - Uploaded files are served as attachments with `application/octet-stream` and `nosniff`.
-- The default maximum upload size is 100 MiB.
+- The default maximum upload size is 90 MiB.
 - `workers.dev` is convenient for this hobby project and does not require a custom domain. Cloudflare recommends a custom domain or route for business-critical production services.

@@ -10,12 +10,27 @@ bucket_name = "hello-cat-downloads"
 [[d1_databases]]
 binding = "FILES_DB"
 database_name = "hello-cat-downloads"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "b22149ec-e51c-4079-b715-f940b89eb4fe"
 migrations_dir = "cloudflare/migrations"
 
 [vars]
-ACCESS_ISSUER = "https://REPLACE_WITH_TEAM_NAME.cloudflareaccess.com"
-ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD"
+ACCESS_ISSUER = "https://green-scene-7051.cloudflareaccess.com"
+ACCESS_AUD = "b5c7349aa78d672522b9735ab61b9efd81792889bac22c9064a3b3cbf55bcebe"
 ALLOWED_ORIGIN = "https://hellocatgroup.github.io"
 ADMIN_PAGE_URL = "https://hellocatgroup.github.io/hellocat.github.io/admin/"
 MAX_UPLOAD_BYTES = "104857600"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = true

@@ -95,8 +95,6 @@ const HCRender = (() => {
 
       document.getElementById("discordName").textContent = data.name || "Hello Cat";
       document.getElementById("onlineCount").textContent = data.presence_count.toLocaleString();
-      if (data.instant_invite) {
-        document.getElementById("discordInvite").href = data.instant_invite;
       }
     } catch (err) {
       console.error("HC discord widget fetch failed:", err);

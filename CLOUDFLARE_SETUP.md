@@ -1,4 +1,4 @@
-# Hello Cat downloads API — GitHub Pages + Cloudflare Workers
+> Current deployment: the Worker, R2 bucket, D1 database, Access application, reusable email policy, and One-time PIN identity provider have been provisioned. The exact live values below are populated. The only administrator is the explicitly approved AtomicMail address; the Worker-side allowlist is stored as a Cloudflare secret and is not in this repository.\n\n# Hello Cat downloads API — GitHub Pages + Cloudflare Workers
 
 The website remains hosted on GitHub Pages at:
 
@@ -40,7 +40,7 @@ Create the D1 database:
 
     npx wrangler d1 create hello-cat-downloads
 
-Copy the `database_id` from the command output into `wrangler.toml`, replacing `REPLACE_WITH_D1_DATABASE_ID`.
+Copy the `database_id` from the command output into `wrangler.toml`, replacing `b22149ec-e51c-4079-b715-f940b89eb4fe`.
 
 Apply the migration:
 
@@ -52,14 +52,14 @@ The migration creates the file metadata table and public-list index.
 
 The Worker name in `wrangler.toml` is `hello-cat-downloads-api`. With `workers_dev = true`, Cloudflare deploys it at:
 
-    https://hello-cat-downloads-api.<YOUR_ACCOUNT_SUBDOMAIN>.workers.dev
+    https://hello-cat-downloads-api.z0ovd.workers.dev
 
-The account subdomain is selected in Cloudflare under Workers & Pages. Do not guess it; copy the exact hostname shown in your account.
+The verified account workers.dev subdomain for this deployment is `z0ovd`.
 
 After the Worker is deployed, edit `js/config.js` and set:
 
     window.HC_CONFIG = Object.freeze({
-      apiBaseUrl: "https://hello-cat-downloads-api.<YOUR_ACCOUNT_SUBDOMAIN>.workers.dev"
+      apiBaseUrl: "https://hello-cat-downloads-api.z0ovd.workers.dev"
     });
 
 Use the real account subdomain in place of the placeholder. Do not include a trailing slash or an `/api` suffix. Commit and push this one-line configuration change so the GitHub Pages admin and downloads pages use the deployed API.
@@ -70,7 +70,7 @@ The Worker is intentionally configured without a `routes` entry. It does not req
 
 Create a self-hosted Access application for this exact Worker hostname and path:
 
-    hello-cat-downloads-api.<YOUR_ACCOUNT_SUBDOMAIN>.workers.dev/api/admin*
+    hello-cat-downloads-api.z0ovd.workers.dev/api/admin*
 
 This protects the login callback and every admin API endpoint while leaving the public `/api/files` list and download routes accessible.
 
@@ -78,11 +78,11 @@ Create an **Allow** policy whose Include rule is the exact email address:
 
     Z0OVD@atomicmail.io
 
-Do not use an email-domain rule, Everyone rule, or any additional email address. Enable an appropriate login method (for example, one-time PIN to the approved email).
+Do not use an email-domain rule, Everyone rule, or any additional email address. The application is configured to use only the One-time PIN identity provider. The Allow policy matches only Z0OVD@atomicmail.io.
 
 Copy the Access team issuer and the application's AUD tag into `wrangler.toml`:
 
-- `ACCESS_ISSUER`: the exact issuer URL shown by Cloudflare Access, normally `https://<YOUR_TEAM>.cloudflareaccess.com`.
+- `ACCESS_ISSUER`: the exact issuer URL shown by Cloudflare Access, normally `https://green-scene-7051.cloudflareaccess.com`.
 - `ACCESS_AUD`: the AUD tag for this self-hosted application.
 
 The Worker supports a comma-separated AUD list, but this setup uses one application.
@@ -107,13 +107,13 @@ The Worker variables in `wrangler.toml` are already set for the current GitHub P
 
 The origin intentionally contains only the scheme and hostname; it does not include the repository path. The admin return URL includes the full project-site path.
 
-The Worker sends credentialed CORS headers only to the exact configured GitHub Pages origin. The browser admin client uses `credentials: "include"` so the Cloudflare Access session cookie is sent to the Worker.
+The Worker sends credentialed CORS headers only to the exact configured GitHub Pages origin. Privileged API routes also reject requests whose Origin header does not exactly match that origin, as a CSRF defense. The browser admin client uses `credentials: "include"` so the Cloudflare Access session cookie is sent to the Worker.
 
 The admin client uses simple CORS requests (GET and POST with browser-generated FormData or URL-encoded bodies) to avoid an Access-blocked preflight. Do not add custom request headers or change these actions to PATCH/DELETE without also configuring Cloudflare Access CORS preflight handling.
 
 ## 6. Deploy
 
-After replacing the D1 ID and Access issuer/AUD values, and setting the `ADMIN_EMAILS` secret, run:
+The Worker is already deployed. The `ADMIN_EMAILS` secret is stored in Cloudflare and is not committed to GitHub. For a future code deployment, run:
 
     npx wrangler deploy
 
@@ -131,8 +131,8 @@ Confirm the deployed URL matches the hostname used in the Access application and
 
 Test the public endpoints:
 
-- `https://hello-cat-downloads-api.<YOUR_ACCOUNT_SUBDOMAIN>.workers.dev/api/files` returns JSON with a `files` array.
-- `https://hello-cat-downloads-api.<YOUR_ACCOUNT_SUBDOMAIN>.workers.dev/api/files/<FILE_ID>/download` downloads a published file.
+- `https://hello-cat-downloads-api.z0ovd.workers.dev/api/files` returns JSON with a `files` array.
+- `https://hello-cat-downloads-api.z0ovd.workers.dev/api/files/<FILE_ID>/download` downloads a published file.
 - The GitHub Pages downloads page lists only published files.
 
 Then upload a small harmless test file, verify it appears on the downloads page, unpublish it and confirm it disappears, publish it again, download it, and finally delete it.

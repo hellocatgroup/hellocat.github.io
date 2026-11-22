@@ -14,7 +14,11 @@ function jsonResponse(data, status) {
 
 function addCorsHeaders(response, request, env) {
   const origin = request.headers.get("Origin");
-  if (!origin || !env.ALLOWED_ORIGIN || origin !== env.ALLOWED_ORIGIN) return response;
+  const allowedOrigins = (env.ALLOWED_ORIGINS || env.ALLOWED_ORIGIN || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (!origin || !allowedOrigins.includes(origin)) return response;
 
   const headers = new Headers(response.headers);
   headers.set("Access-Control-Allow-Origin", origin);

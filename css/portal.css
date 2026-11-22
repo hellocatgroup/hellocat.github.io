@@ -250,3 +250,8 @@ body.portal-body {
   .portal-file-actions { width: 100%; justify-content: flex-start; }
   .portal-download-card .portal-button { width: 100%; }
 }
+
+/* Keep privileged controls hidden until the admin API verifies an authorized session. */
+#adminControls[hidden] {
+  display: none !important;
+}

@@ -40,7 +40,7 @@ async function fetchAccessKeys(issuer, forceRefresh) {
 }
 
 async function verifyAccessRequest(request, env) {
-  if (!env.ACCESS_ISSUER || !env.ACCESS_AUD) return false;
+  if (!env.ACCESS_ISSUER || !env.ACCESS_AUD || !env.ADMIN_EMAILS) return false;
   const token = request.headers.get("Cf-Access-Jwt-Assertion");
   if (!token) return false;
 
@@ -81,6 +81,13 @@ async function verifyAccessRequest(request, env) {
     if (!allowedAudiences.some((audience) => audiences.includes(audience))) return false;
     if (!Number.isFinite(Number(claims.exp)) || Number(claims.exp) <= now) return false;
     if (claims.nbf && Number(claims.nbf) > now + 60) return false;
+
+    // Defense in depth: only explicitly listed administrator emails can manage files,
+    // even if the Cloudflare Access application policy is accidentally broadened.
+    const allowedEmails = String(env.ADMIN_EMAILS).split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+    const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
+    if (!email || !allowedEmails.includes(email)) return false;
+
     return true;
   } catch (error) {
     console.error("Access token validation failed:", error);
@@ -248,7 +255,7 @@ async function handleRequest(request, env) {
   if (downloadMatch && request.method === "GET") return downloadFile(downloadMatch[1], env);
 
   if (path === "/api/admin/files") {
-    if (!env.ACCESS_ISSUER || !env.ACCESS_AUD) {
+    if (!env.ACCESS_ISSUER || !env.ACCESS_AUD || !env.ADMIN_EMAILS) {
       return jsonResponse({ error: "Admin authentication has not been configured." }, 503);
     }
     if (!(await verifyAccessRequest(request, env))) return jsonResponse({ error: "Admin access denied." }, 401);
@@ -259,7 +266,7 @@ async function handleRequest(request, env) {
 
   const adminFileMatch = path.match(/^\/api\/admin\/files\/([a-f0-9]{32})$/);
   if (adminFileMatch) {
-    if (!env.ACCESS_ISSUER || !env.ACCESS_AUD) {
+    if (!env.ACCESS_ISSUER || !env.ACCESS_AUD || !env.ADMIN_EMAILS) {
       return jsonResponse({ error: "Admin authentication has not been configured." }, 503);
     }
     if (!(await verifyAccessRequest(request, env))) return jsonResponse({ error: "Admin access denied." }, 401);

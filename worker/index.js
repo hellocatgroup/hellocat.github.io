@@ -267,10 +267,51 @@ async function deleteFile(id, env) {
 
 function adminOriginError(request, env) {
   const origin = request.headers.get("Origin");
-  if (!env.ALLOWED_ORIGIN || origin !== env.ALLOWED_ORIGIN) {
-    return jsonResponse({ error: "Admin requests must originate from the Hello Cat site." }, 403);
+  const expectedOrigin = env.ADMIN_ORIGIN;
+  if (!expectedOrigin) {
+    return jsonResponse({ error: "Admin origin has not been configured." }, 503);
   }
-  return null;
+  if (origin) {
+    return origin === expectedOrigin
+      ? null
+      : jsonResponse({ error: "Admin requests must originate from the protected admin application." }, 403);
+  }
+  // Same-origin GET requests may omit Origin. Require the browser Fetch Metadata
+  // header instead; the Access JWT and email allowlist are still checked separately.
+  if (request.headers.get("Sec-Fetch-Site") === "same-origin") return null;
+  return jsonResponse({ error: "Admin request origin could not be verified." }, 403);
+}
+
+async function serveAdminApp(request, env) {
+  const authError = await adminAuthError(request, env);
+  if (authError) return authError;
+  if (!env.ADMIN_SOURCE_URL || !env.ADMIN_ASSET_BASE_URL) {
+    return jsonResponse({ error: "Admin application source has not been configured." }, 503);
+  }
+
+  const upstream = await fetch(env.ADMIN_SOURCE_URL, {
+    headers: { "Accept": "text/html", "Cache-Control": "no-cache" },
+    redirect: "error"
+  });
+  if (!upstream.ok) {
+    console.error("Unable to load admin application source:", upstream.status);
+    return jsonResponse({ error: "The admin application could not be loaded." }, 502);
+  }
+
+  let html = await upstream.text();
+  const headTag = html.match(/<head(?:\\s[^>]*)?>/i);
+  if (!headTag) return jsonResponse({ error: "The admin application HTML is invalid." }, 502);
+  const baseTag = '<base href="' + env.ADMIN_ASSET_BASE_URL.replace(/"/g, "&quot;") + '">';
+  html = html.replace(headTag[0], headTag[0] + "\\n  " + baseTag);
+
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "same-origin"
+    }
+  });
 }
 
 async function adminAuthError(request, env) {
@@ -286,6 +327,11 @@ async function adminAuthError(request, env) {
 async function handleRequest(request, env) {
   const path = new URL(request.url).pathname;
 
+  if (path === "/admin" && request.method === "GET") {
+    return Response.redirect(new URL("/admin/", request.url).toString(), 308);
+  }
+  if (path === "/admin/" && request.method === "GET") return serveAdminApp(request, env);
+
   if (path === "/api/files" && request.method === "GET") return listPublicFiles(env);
 
   const downloadMatch = path.match(/^\/api\/files\/([a-f0-9]{32})\/download$/);
@@ -295,8 +341,8 @@ async function handleRequest(request, env) {
   if (path === "/api/admin/login" && request.method === "GET") {
     const authError = await adminAuthError(request, env);
     if (authError) return authError;
-    if (!env.ADMIN_PAGE_URL) return jsonResponse({ error: "Admin return URL has not been configured." }, 503);
-    return Response.redirect(env.ADMIN_PAGE_URL, 302);
+    if (!env.ADMIN_APP_URL) return jsonResponse({ error: "Admin return URL has not been configured." }, 503);
+    return Response.redirect(env.ADMIN_APP_URL, 302);
   }
 
   if (path === "/api/admin/files") {

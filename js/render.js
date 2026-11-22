@@ -85,23 +85,30 @@ const HCRender = (() => {
   const DISCORD_GUILD_ID = "1563428054464995351";
   const DISCORD_WIDGET_URL = `https://discord.com/api/guilds/${DISCORD_GUILD_ID}/widget.json`;
 
-  async function renderDiscord() {
-    document.getElementById("discordInvite").href = HC_DATA.discord.inviteUrl;
+async function renderDiscord() {
+  const inviteButton = document.getElementById("discordInvite");
 
-    try {
-      const res = await fetch(DISCORD_WIDGET_URL);
-      if (!res.ok) throw new Error("widget unavailable");
-      const data = await res.json();
-
-      document.getElementById("discordName").textContent = data.name || "Hello Cat";
-      document.getElementById("onlineCount").textContent = data.presence_count.toLocaleString();
-      }
-    } catch (err) {
-      console.error("HC discord widget fetch failed:", err);
-      document.getElementById("onlineCount").textContent = "—";
-    }
+  if (inviteButton) {
+    inviteButton.href = HC_DATA.discord.inviteUrl;
   }
 
+  try {
+    const res = await fetch(DISCORD_WIDGET_URL);
+    if (!res.ok) throw new Error("widget unavailable");
+
+    const data = await res.json();
+
+    document.getElementById("discordName").textContent =
+      data.name || "Hello Cat";
+
+    document.getElementById("onlineCount").textContent =
+      data.presence_count.toLocaleString();
+
+  } catch (err) {
+    console.error("HC discord widget fetch failed:", err);
+    document.getElementById("onlineCount").textContent = "—";
+  }
+}
   function init() {
     renderMembers();
     renderStore();

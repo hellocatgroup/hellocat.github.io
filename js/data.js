@@ -1,6 +1,6 @@
 const HC_DATA = {
   discord: {
-    inviteUrl: "https://discord.gg/VKPhNVFnak"
+    inviteUrl: "https://discord.gg/hellocat"
   },
   members: [
     { name: "Leet", role: "Founder", bio: "“I'd rather understand a system's limitations than blindly accept its design.”", pfp: "assets/members/leet.png" },

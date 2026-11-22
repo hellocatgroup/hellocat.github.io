@@ -299,10 +299,10 @@ async function serveAdminApp(request, env) {
   }
 
   let html = await upstream.text();
-  const headTag = html.match(/<head(?:\\s[^>]*)?>/i);
+  const headTag = html.match(/<head(?:\s[^>]*)?>/i);
   if (!headTag) return jsonResponse({ error: "The admin application HTML is invalid." }, 502);
   const baseTag = '<base href="' + env.ADMIN_ASSET_BASE_URL.replace(/"/g, "&quot;") + '">';
-  html = html.replace(headTag[0], headTag[0] + "\\n  " + baseTag);
+  html = html.replace(headTag[0], headTag[0] + "\n  " + baseTag);
 
   return new Response(html, {
     headers: {

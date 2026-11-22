@@ -265,6 +265,14 @@ async function deleteFile(id, env) {
   return jsonResponse({ success: true });
 }
 
+function adminOriginError(request, env) {
+  const origin = request.headers.get("Origin");
+  if (!env.ALLOWED_ORIGIN || origin !== env.ALLOWED_ORIGIN) {
+    return jsonResponse({ error: "Admin requests must originate from the Hello Cat site." }, 403);
+  }
+  return null;
+}
+
 async function adminAuthError(request, env) {
   if (!env.ACCESS_ISSUER || !env.ACCESS_AUD || !env.ADMIN_EMAILS) {
     return jsonResponse({ error: "Admin authentication has not been configured." }, 503);
@@ -292,6 +300,8 @@ async function handleRequest(request, env) {
   }
 
   if (path === "/api/admin/files") {
+    const originError = adminOriginError(request, env);
+    if (originError) return originError;
     const authError = await adminAuthError(request, env);
     if (authError) return authError;
     if (request.method === "GET") return listAdminFiles(env);
@@ -301,6 +311,8 @@ async function handleRequest(request, env) {
 
   const adminActionMatch = path.match(/^\/api\/admin\/files\/([a-f0-9]{32})\/(publish|delete)$/);
   if (adminActionMatch) {
+    const originError = adminOriginError(request, env);
+    if (originError) return originError;
     const authError = await adminAuthError(request, env);
     if (authError) return authError;
     if (request.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405);

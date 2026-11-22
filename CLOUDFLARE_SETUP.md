@@ -1,147 +1,98 @@
-> Current deployment: the Worker, R2 bucket, D1 database, Access application, reusable email policy, and One-time PIN identity provider have been provisioned. The exact live values below are populated. The only administrator is the explicitly approved AtomicMail address; the Worker-side allowlist is stored as a Cloudflare secret and is not in this repository.\n\n# Hello Cat downloads API — GitHub Pages + Cloudflare Workers
+# Hello Cat downloads service
 
-The website remains hosted on GitHub Pages at:
+This document describes the live GitHub Pages + Cloudflare setup.
+
+## Live URLs
 
 - Main site: https://hellocatgroup.github.io/hellocat.github.io/
 - Admin page: https://hellocatgroup.github.io/hellocat.github.io/admin/
 - Public downloads: https://hellocatgroup.github.io/hellocat.github.io/downloads/
+- Worker API: https://hello-cat-downloads-api.z0ovd.workers.dev
 
-The frontend is a GitHub Pages **project site**, so its repository path is part of every page URL. Internal page links are relative for this reason.
+The website remains hosted on GitHub Pages as a project site. The file API runs separately on Cloudflare Workers. No custom domain, Cloudflare DNS zone, or DNS change is required.
 
-The file API runs separately as a Cloudflare Worker on a `workers.dev` hostname. No custom domain, Cloudflare DNS zone, or DNS change is required.
+## Provisioned resources
 
-## Important security boundary
+- Worker: `hello-cat-downloads-api`
+- Worker subdomain: `z0ovd.workers.dev`
+- R2 bucket: `hello-cat-downloads`
+- D1 database: `hello-cat-downloads`
+- D1 migration: `cloudflare/migrations/0001_create_files.sql`
+- Access application: `Hello Cat Downloads Admin`
+- Access login method: One-time PIN only
+- Access policy: one exact administrator email address, configured in Cloudflare
+- Worker secret: `ADMIN_EMAILS`, stored in Cloudflare and not committed to this repository
 
-GitHub Pages serves static files and is not behind Cloudflare Access in this setup. Therefore, the static admin page itself can be opened by anyone who knows its URL. It contains no credentials and keeps all upload/management controls hidden until the Worker confirms an authenticated administrator session.
+The D1 migration creates the file metadata table and the index used by the public downloads list.
 
-Cloudflare Access protects **all privileged API endpoints** under `/api/admin*`, and the Worker independently validates the Access JWT and checks the email against the `ADMIN_EMAILS` secret. A visitor who can view the static admin page still cannot upload, publish, unpublish, list private admin metadata, or delete files.
+## Security boundary
 
-If you later want Cloudflare Access to block the admin HTML page itself before it is served, the frontend must also be served through Cloudflare (for example, behind a Cloudflare-proxied custom domain or moved to Cloudflare Pages/Workers). That is not required to secure file operations and is intentionally not part of this GitHub Pages-only setup.
+GitHub Pages serves the static admin page publicly. The page contains no credentials and keeps management controls hidden until the Worker confirms an authenticated administrator session.
 
-The public downloads page and published file download endpoints are public by design. The downloads page is unlisted and marked noindex, but its URL is shareable.
+Cloudflare Access protects every privileged API endpoint under `/api/admin*`. Its reusable Allow policy matches only the approved administrator email. The application uses the One-time PIN identity provider so the administrator does not need to be a member of the Cloudflare account.
 
-## 1. Requirements
+The Worker independently validates the Access JWT signature, issuer, audience, expiry, not-before claim, and the exact email against the `ADMIN_EMAILS` Worker secret. Privileged API routes also reject requests whose `Origin` header does not exactly match the GitHub Pages origin.
 
-- A Cloudflare account with Workers, R2, D1, and Zero Trust Access available.
-- A configured account `workers.dev` subdomain.
-- Wrangler CLI installed and authenticated:
+The static admin page itself is not behind Cloudflare Access. This is intentional: authorization is enforced by the API, not by hiding the HTML page. Anyone who knows the admin URL can view the shell, but cannot list private admin metadata, upload, publish, unpublish, or delete files without the authorized Access session.
 
-      npx wrangler login
+The public downloads page and published download endpoints are public by design. The downloads page is unlisted and marked `noindex, nofollow`, but its URL is shareable. Only published files appear there; unpublished files cannot be downloaded through the public endpoint.
 
-No `helloc.at` DNS zone or custom domain is needed.
+## Configuration
 
-## 2. Create storage
+The frontend API base URL is configured in `js/config.js`:
 
-From the repository root, create the R2 bucket:
+```js
+window.HC_CONFIG = Object.freeze({
+  apiBaseUrl: "https://hello-cat-downloads-api.z0ovd.workers.dev"
+});
+```
 
-    npx wrangler r2 bucket create hello-cat-downloads
+The Worker configuration is mirrored in `wrangler.toml`, including the D1 database ID, R2 binding, Access issuer and audience, allowed frontend origin, admin return URL, and upload-size limit.
 
-Create the D1 database:
+The `ADMIN_EMAILS` value is a Cloudflare Worker secret. Never add its value to `js/config.js`, HTML, `wrangler.toml`, or any other public repository file.
 
-    npx wrangler d1 create hello-cat-downloads
+The Worker allows requests from this exact frontend origin:
 
-Copy the `database_id` from the command output into `wrangler.toml`, replacing `b22149ec-e51c-4079-b715-f940b89eb4fe`.
+- `https://hellocatgroup.github.io`
 
-Apply the migration:
+The origin does not include the repository path. The admin return URL does include the full project-site path.
 
-    npx wrangler d1 migrations apply hello-cat-downloads --remote
+## Upload and download behavior
 
-The migration creates the file metadata table and public-list index.
+- Maximum upload size: 90 MiB.
+- Files are stored privately in R2.
+- File metadata and publication state are stored in D1.
+- Admins can upload, publish, unpublish, and delete files.
+- Only published files appear on the public downloads page.
+- Downloads are served as attachments with `application/octet-stream` and `X-Content-Type-Options: nosniff`.
 
-## 3. Configure the Worker hostname
+The Worker uses credentialed CORS only for the exact GitHub Pages origin. The browser admin client uses `credentials: "include"`. Its API requests use simple GET/POST requests so they do not require a separate Access-protected preflight flow.
 
-The Worker name in `wrangler.toml` is `hello-cat-downloads-api`. With `workers_dev = true`, Cloudflare deploys it at:
+## Sign in and test
 
-    https://hello-cat-downloads-api.z0ovd.workers.dev
+1. Open the admin page: https://hellocatgroup.github.io/hellocat.github.io/admin/
+2. Select **Sign in with Cloudflare Access**.
+3. Authenticate using the approved administrator email and the One-time PIN sent by Cloudflare.
+4. Return to the admin page. The upload and management controls appear only after the Worker confirms authorization.
+5. Upload a small harmless test file and publish it.
+6. Open the downloads page and confirm the file appears and downloads.
+7. Unpublish it and confirm it disappears from the public list; publish it again and confirm it returns.
+8. Delete the test file when finished.
+9. Test with a different email address. Cloudflare Access should deny it, and the Worker-side allowlist provides an independent second check.
 
-The verified account workers.dev subdomain for this deployment is `z0ovd`.
+Public API endpoints:
 
-After the Worker is deployed, edit `js/config.js` and set:
+- `GET https://hello-cat-downloads-api.z0ovd.workers.dev/api/files` returns the published file list.
+- `GET https://hello-cat-downloads-api.z0ovd.workers.dev/api/files/<FILE_ID>/download` downloads a published file.
 
-    window.HC_CONFIG = Object.freeze({
-      apiBaseUrl: "https://hello-cat-downloads-api.z0ovd.workers.dev"
-    });
+## Future deployments
 
-Use the real account subdomain in place of the placeholder. Do not include a trailing slash or an `/api` suffix. Commit and push this one-line configuration change so the GitHub Pages admin and downloads pages use the deployed API.
+From the repository root, with Wrangler installed and authenticated:
 
-The Worker is intentionally configured without a `routes` entry. It does not require or modify DNS for `helloc.at`.
+```sh
+npx wrangler deploy
+```
 
-## 4. Configure Cloudflare Access
+The existing `ADMIN_EMAILS` secret remains stored in Cloudflare. Do not put it in source control. After future changes, verify the active Worker version, bindings, Access policy, public file list, and an authenticated upload before treating the service as production-ready.
 
-Create a self-hosted Access application for this exact Worker hostname and path:
-
-    hello-cat-downloads-api.z0ovd.workers.dev/api/admin*
-
-This protects the login callback and every admin API endpoint while leaving the public `/api/files` list and download routes accessible.
-
-Create an **Allow** policy whose Include rule is the exact email address:
-
-    Z0OVD@atomicmail.io
-
-Do not use an email-domain rule, Everyone rule, or any additional email address. The application is configured to use only the One-time PIN identity provider. The Allow policy matches only Z0OVD@atomicmail.io.
-
-Copy the Access team issuer and the application's AUD tag into `wrangler.toml`:
-
-- `ACCESS_ISSUER`: the exact issuer URL shown by Cloudflare Access, normally `https://green-scene-7051.cloudflareaccess.com`.
-- `ACCESS_AUD`: the AUD tag for this self-hosted application.
-
-The Worker supports a comma-separated AUD list, but this setup uses one application.
-
-Set the independent Worker-side email allowlist as a secret:
-
-    npx wrangler secret put ADMIN_EMAILS
-
-When prompted, enter exactly:
-
-    Z0OVD@atomicmail.io
-
-This is a Worker secret. Never put it in `js/config.js`, HTML, or any other public repository file.
-
-## 5. Configure the public frontend origin
-
-The Worker variables in `wrangler.toml` are already set for the current GitHub Pages project site:
-
-- `ALLOWED_ORIGIN = "https://hellocatgroup.github.io"`
-- `ADMIN_PAGE_URL = "https://hellocatgroup.github.io/hellocat.github.io/admin/"`
-- `MAX_UPLOAD_BYTES = "94371840"`
-
-The origin intentionally contains only the scheme and hostname; it does not include the repository path. The admin return URL includes the full project-site path.
-
-The Worker sends credentialed CORS headers only to the exact configured GitHub Pages origin. Privileged API routes also reject requests whose Origin header does not exactly match that origin, as a CSRF defense. The browser admin client uses `credentials: "include"` so the Cloudflare Access session cookie is sent to the Worker.
-
-The admin client uses simple CORS requests (GET and POST with browser-generated FormData or URL-encoded bodies) to avoid an Access-blocked preflight. Do not add custom request headers or change these actions to PATCH/DELETE without also configuring Cloudflare Access CORS preflight handling.
-
-## 6. Deploy
-
-The Worker is already deployed. The `ADMIN_EMAILS` secret is stored in Cloudflare and is not committed to GitHub. For a future code deployment, run:
-
-    npx wrangler deploy
-
-Confirm the deployed URL matches the hostname used in the Access application and in `js/config.js`.
-
-## 7. Sign in and test
-
-1. Open the GitHub Pages admin page:
-   https://hellocatgroup.github.io/hellocat.github.io/admin/
-2. Once `js/config.js` contains the deployed Worker URL, the page will check for an existing authorized session.
-3. If no session is present, select **Sign in with Cloudflare Access**. This opens the protected Worker login endpoint. After successful Access authentication and the Worker's independent email check, the Worker returns the browser to the admin page.
-4. The browser must allow the Cloudflare Access cookie for the `workers.dev` hostname in cross-site requests. If the sign-in succeeds but the admin page still cannot verify the session, check browser third-party-cookie/privacy settings for that Worker hostname, then refresh.
-5. Confirm the upload and management controls appear only after the Worker returns a valid admin file list.
-6. Try a different email address. Cloudflare Access should deny it; even if the Access policy is accidentally broadened, the Worker allowlist must still reject its JWT.
-
-Test the public endpoints:
-
-- `https://hello-cat-downloads-api.z0ovd.workers.dev/api/files` returns JSON with a `files` array.
-- `https://hello-cat-downloads-api.z0ovd.workers.dev/api/files/<FILE_ID>/download` downloads a published file.
-- The GitHub Pages downloads page lists only published files.
-
-Then upload a small harmless test file, verify it appears on the downloads page, unpublish it and confirm it disappears, publish it again, download it, and finally delete it.
-
-## Security and behavior
-
-- Cloudflare Access protects `/api/admin*`; the Worker independently verifies the signed JWT, issuer, audience, expiry, not-before claim, and exact email allowlist.
-- The static GitHub Pages admin shell is public in this deployment, but privileged controls remain hidden until the API confirms authorization. No file-management action is trusted to frontend visibility alone.
-- Public file listing contains published files only. Unpublished files cannot be downloaded through the public endpoint.
-- Uploaded files are served as attachments with `application/octet-stream` and `nosniff`.
-- The default maximum upload size is 90 MiB.
-- `workers.dev` is convenient for this hobby project and does not require a custom domain. Cloudflare recommends a custom domain or route for business-critical production services.
+GitHub Pages updates automatically after commits to the configured publishing branch. No custom domain or DNS change is required for this setup.

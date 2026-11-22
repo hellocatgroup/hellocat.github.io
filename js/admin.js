@@ -1,7 +1,9 @@
 (() => {
   const API_BASE_URL = String(window.HC_CONFIG?.apiBaseUrl || "").replace(/\/+$/, "");
   const API_ROOT = API_BASE_URL ? API_BASE_URL + "/api/admin/files" : "";
-  const LOGIN_URL = API_BASE_URL ? API_BASE_URL + "/api/admin/login" : "";
+  // Login is a top-level navigation to the Access-protected admin app. This
+  // avoids following Cloudflare's cross-origin login redirect inside fetch().
+  const LOGIN_URL = API_BASE_URL ? API_BASE_URL + "/admin/" : "";
   const adminControls = document.getElementById("adminControls");
   const form = document.getElementById("uploadForm");
   const fileInput = document.getElementById("fileInput");

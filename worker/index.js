@@ -289,10 +289,21 @@ async function serveAdminApp(request, env) {
     return jsonResponse({ error: "Admin application source has not been configured." }, 503);
   }
 
-  const upstream = await fetch(env.ADMIN_SOURCE_URL, {
-    headers: { "Accept": "text/html", "Cache-Control": "no-cache" },
-    redirect: "error"
-  });
+  let upstream;
+  try {
+    // GitHub Pages may issue a canonical redirect for a project-site URL.
+    // Follow that trusted source redirect instead of throwing before the HTML loads.
+    upstream = await fetch(env.ADMIN_SOURCE_URL, {
+      headers: { "Accept": "text/html", "Cache-Control": "no-cache" },
+      redirect: "follow"
+    });
+  } catch (error) {
+    console.error("Admin source fetch failed:", {
+      name: error?.name || "Error",
+      message: error?.message || String(error)
+    });
+    return jsonResponse({ error: "The admin application source could not be reached." }, 502);
+  }
   if (!upstream.ok) {
     console.error("Unable to load admin application source:", upstream.status);
     return jsonResponse({ error: "The admin application could not be loaded." }, 502);
@@ -378,7 +389,11 @@ export default {
       const response = await handleRequest(request, env);
       return addCorsHeaders(response, request, env);
     } catch (error) {
-      console.error("Hello Cat file service error:", error);
+      console.error("Hello Cat file service error:", {
+        name: error?.name || "Error",
+        message: error?.message || String(error),
+        stack: error?.stack || ""
+      });
       return addCorsHeaders(
         jsonResponse({ error: "The file service encountered an internal error." }, 500),
         request,

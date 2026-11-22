@@ -1,16 +1,9 @@
 const HCGate = (() => {
-  function enter(skipAnimation) {
+  function enter() {
     const gate = document.getElementById("gate");
     const app = document.getElementById("app");
 
     app.hidden = false;
-    sessionStorage.setItem("hc_entered", "1");
-
-    if (skipAnimation) {
-      gate.remove();
-      return;
-    }
-
     gate.classList.add("is-leaving");
     gate.addEventListener(
       "transitionend",
@@ -39,12 +32,8 @@ const HCGate = (() => {
 
   function init() {
     const gate = document.getElementById("gate");
-    gate.addEventListener("click", () => enter(false));
+    gate.addEventListener("click", () => enter());
     initParallax();
-
-    if (sessionStorage.getItem("hc_entered") === "1") {
-      enter(true);
-    }
   }
 
   return { init };

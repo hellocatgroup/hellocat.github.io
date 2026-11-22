@@ -62,7 +62,7 @@ The Worker configuration is mirrored in `wrangler.toml`:
 - `ALLOWED_ORIGIN`: GitHub Pages origin, used by the public downloads API.
 - `ADMIN_ORIGIN`: Worker origin used by the same-origin admin interface.
 - `ADMIN_SOURCE_URL`: GitHub Pages source HTML for the admin app.
-- `ADMIN_ASSET_BASE_URL`: GitHub Pages project-site root for static assets.
+- `ADMIN_ASSET_BASE_URL`: GitHub Pages admin directory, so the existing `../css`, `../js`, `../assets`, and `../downloads/` paths resolve correctly.
 - `ADMIN_APP_URL`: Worker-hosted admin URL.
 - `MAX_UPLOAD_BYTES`: 90 MiB.
 

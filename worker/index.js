@@ -174,7 +174,7 @@ async function downloadFile(id, env) {
 }
 
 async function uploadFile(request, env) {
-  const maxBytes = Number.parseInt(env.MAX_UPLOAD_BYTES || "104857600", 10);
+  const maxBytes = Number.parseInt(env.MAX_UPLOAD_BYTES || "94371840", 10);
   const declaredLength = Number.parseInt(request.headers.get("Content-Length") || "0", 10);
   if (declaredLength && declaredLength > maxBytes + 1024 * 1024) {
     return jsonResponse({ error: "Upload exceeds the configured size limit." }, 413);

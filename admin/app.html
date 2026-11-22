@@ -16,7 +16,7 @@
   <script>
     // If this source file is opened directly on GitHub Pages, use the same-origin
     // Worker-hosted admin app so Cloudflare Access cookies are first-party.
-    if (window.location.hostname === "hellocatgroup.github.io") {
+    if (["hellocatgroup.github.io", "helloc.at", "www.helloc.at"].includes(window.location.hostname)) {
       window.location.replace("https://hello-cat-downloads-api.z0ovd.workers.dev/admin/");
     }
   </script>

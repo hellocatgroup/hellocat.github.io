@@ -1,5 +1,7 @@
 (() => {
-  const API_ROOT = "/api/admin/files";
+  const API_BASE_URL = String(window.HC_CONFIG?.apiBaseUrl || "").replace(/\/+$/, "");
+  const API_ROOT = API_BASE_URL ? API_BASE_URL + "/api/admin/files" : "";
+  const LOGIN_URL = API_BASE_URL ? API_BASE_URL + "/api/admin/login" : "";
   const adminControls = document.getElementById("adminControls");
   const form = document.getElementById("uploadForm");
   const fileInput = document.getElementById("fileInput");
@@ -10,6 +12,10 @@
   const fileList = document.getElementById("fileList");
   const accessNotice = document.getElementById("accessNotice");
   const refreshButton = document.getElementById("refreshButton");
+  const accessActions = document.getElementById("accessActions");
+  const accessLoginLink = document.getElementById("accessLoginLink");
+
+  if (accessLoginLink && LOGIN_URL) accessLoginLink.href = LOGIN_URL;
 
   function setStatus(element, message, kind) {
     element.textContent = message;
@@ -20,6 +26,10 @@
   function lockAdminUI(message, kind) {
     adminControls.hidden = true;
     setStatus(accessNotice, message, kind || "error");
+  }
+
+  function showLoginAction(show) {
+    if (accessActions) accessActions.hidden = !show;
   }
 
   function formatBytes(bytes) {
@@ -37,23 +47,29 @@
   }
 
   async function request(url, options) {
-    const response = await fetch(url, Object.assign({ credentials: "same-origin", cache: "no-store" }, options || {}));
+    const response = await fetch(url, Object.assign({
+      credentials: "include",
+      cache: "no-store"
+    }, options || {}));
     const contentType = response.headers.get("content-type") || "";
     const isJson = contentType.toLowerCase().includes("application/json");
     const payload = isJson ? await response.json().catch(() => ({})) : {};
 
     if (response.status === 401 || response.status === 403) {
-      lockAdminUI("Access denied. Sign in through Cloudflare Access with an approved administrator account.", "error");
+      lockAdminUI("Access denied. Sign in through Cloudflare Access with the approved administrator account.", "error");
+      showLoginAction(true);
       throw new Error("Admin access denied.");
     }
 
     if (response.status === 503 && String(payload.error || "").toLowerCase().includes("authentication")) {
       lockAdminUI("Admin panel locked. Cloudflare Access and the administrator email allowlist have not been configured.", "error");
+      showLoginAction(false);
       throw new Error("Admin authentication is not configured.");
     }
 
     if (!isJson) {
-      lockAdminUI("Admin panel locked. The API did not return an authenticated JSON response; check Cloudflare Access and the Worker route.", "error");
+      lockAdminUI("The API did not return an authenticated JSON response. Sign in through Cloudflare Access, then try again.", "error");
+      showLoginAction(true);
       throw new Error("Admin API did not return JSON.");
     }
 
@@ -110,10 +126,10 @@
       const publishButton = makeAction(file.published ? "Unpublish" : "Publish", "portal-button--secondary", async () => {
         publishButton.disabled = true;
         try {
-          await request(API_ROOT + "/" + encodeURIComponent(file.id), {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ published: !file.published })
+          const body = new URLSearchParams({ published: String(!file.published) });
+          await request(API_ROOT + "/" + encodeURIComponent(file.id) + "/publish", {
+            method: "POST",
+            body
           });
           await loadFiles();
         } catch (error) {
@@ -126,7 +142,7 @@
         if (!window.confirm("Permanently delete " + file.fileName + "?")) return;
         deleteButton.disabled = true;
         try {
-          await request(API_ROOT + "/" + encodeURIComponent(file.id), { method: "DELETE" });
+          await request(API_ROOT + "/" + encodeURIComponent(file.id) + "/delete", { method: "POST" });
           await loadFiles();
           setStatus(uploadStatus, "File deleted.", "success");
         } catch (error) {
@@ -142,7 +158,19 @@
   }
 
   async function loadFiles() {
+    if (!API_BASE_URL) {
+      lockAdminUI("The file service has not been connected yet. Deploy the Worker, then set apiBaseUrl in js/config.js.", "error");
+      showLoginAction(false);
+      fileList.replaceChildren();
+      const empty = document.createElement("p");
+      empty.className = "portal-empty";
+      empty.textContent = "File management is unavailable until the Cloudflare Worker URL is configured.";
+      fileList.appendChild(empty);
+      return;
+    }
+
     lockAdminUI("Verifying administrator access…", "info");
+    showLoginAction(false);
     fileList.replaceChildren();
     const loading = document.createElement("p");
     loading.className = "portal-empty";
@@ -156,25 +184,31 @@
       }
       renderFiles(payload.files);
       adminControls.hidden = false;
+      showLoginAction(false);
       setStatus(accessNotice, "Authorized administrator session verified. File management is enabled.", "success");
     } catch (error) {
       adminControls.hidden = true;
+      showLoginAction(error.message !== "Admin authentication is not configured.");
       const empty = document.createElement("p");
       empty.className = "portal-empty";
       empty.textContent = error.message === "Admin access denied."
-        ? "This area is restricted. Sign in through Cloudflare Access using an approved administrator account."
+        ? "This area is restricted. Sign in using the approved administrator account."
         : error.message === "Admin authentication is not configured."
           ? "Uploads are disabled until Cloudflare Access and the administrator email allowlist are configured."
-          : "The admin service could not verify your session. File management remains locked.";
+          : "The admin service could not verify your session. Use the sign-in link above, then return here.";
       fileList.replaceChildren(empty);
       if (error.message !== "Admin access denied." && error.message !== "Admin authentication is not configured.") {
-        setStatus(accessNotice, "Admin authentication could not be verified. No upload or management controls are available.", "error");
+        setStatus(accessNotice, "Administrator authentication could not be verified. No upload or management controls are available.", "error");
       }
     }
   }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!API_ROOT) {
+      setStatus(uploadStatus, "The file service is not configured yet.", "error");
+      return;
+    }
     if (!fileInput.files || !fileInput.files.length) {
       setStatus(uploadStatus, "Choose a file first.", "error");
       return;

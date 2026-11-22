@@ -12,6 +12,23 @@ function jsonResponse(data, status) {
   });
 }
 
+function addCorsHeaders(response, request, env) {
+  const origin = request.headers.get("Origin");
+  if (!origin || !env.ALLOWED_ORIGIN || origin !== env.ALLOWED_ORIGIN) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Access-Control-Allow-Credentials", "true");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type");
+  headers.set("Vary", "Origin");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 function base64UrlToBytes(value) {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized + "===".slice((normalized.length + 3) % 4);
@@ -214,25 +231,27 @@ async function uploadFile(request, env) {
 }
 
 async function updateFile(id, request, env) {
+  let form;
+  try {
+    form = await request.formData();
+  } catch (error) {
+    return jsonResponse({ error: "Invalid form body." }, 400);
+  }
+  const publishedValue = form.get("published");
+  if (publishedValue !== "true" && publishedValue !== "false") {
+    return jsonResponse({ error: "A published value of true or false is required." }, 400);
+  }
+
   const current = await env.FILES_DB.prepare(
     "SELECT id FROM files WHERE id = ?"
   ).bind(id).first();
   if (!current) return jsonResponse({ error: "File not found." }, 404);
 
-  let body;
-  try {
-    body = await request.json();
-  } catch (error) {
-    return jsonResponse({ error: "Invalid JSON body." }, 400);
-  }
-  if (typeof body.published !== "boolean") {
-    return jsonResponse({ error: "A boolean published value is required." }, 400);
-  }
-
+  const published = publishedValue === "true";
   await env.FILES_DB.prepare(
     "UPDATE files SET published = ? WHERE id = ?"
-  ).bind(body.published ? 1 : 0, id).run();
-  return jsonResponse({ success: true, published: body.published });
+  ).bind(published ? 1 : 0, id).run();
+  return jsonResponse({ success: true, published: published });
 }
 
 async function deleteFile(id, env) {
@@ -246,6 +265,16 @@ async function deleteFile(id, env) {
   return jsonResponse({ success: true });
 }
 
+async function adminAuthError(request, env) {
+  if (!env.ACCESS_ISSUER || !env.ACCESS_AUD || !env.ADMIN_EMAILS) {
+    return jsonResponse({ error: "Admin authentication has not been configured." }, 503);
+  }
+  if (!(await verifyAccessRequest(request, env))) {
+    return jsonResponse({ error: "Admin access denied." }, 401);
+  }
+  return null;
+}
+
 async function handleRequest(request, env) {
   const path = new URL(request.url).pathname;
 
@@ -254,25 +283,29 @@ async function handleRequest(request, env) {
   const downloadMatch = path.match(/^\/api\/files\/([a-f0-9]{32})\/download$/);
   if (downloadMatch && request.method === "GET") return downloadFile(downloadMatch[1], env);
 
+  // Top-level navigation starts Access login. After authentication, return to GitHub Pages.
+  if (path === "/api/admin/login" && request.method === "GET") {
+    const authError = await adminAuthError(request, env);
+    if (authError) return authError;
+    if (!env.ADMIN_PAGE_URL) return jsonResponse({ error: "Admin return URL has not been configured." }, 503);
+    return Response.redirect(env.ADMIN_PAGE_URL, 302);
+  }
+
   if (path === "/api/admin/files") {
-    if (!env.ACCESS_ISSUER || !env.ACCESS_AUD || !env.ADMIN_EMAILS) {
-      return jsonResponse({ error: "Admin authentication has not been configured." }, 503);
-    }
-    if (!(await verifyAccessRequest(request, env))) return jsonResponse({ error: "Admin access denied." }, 401);
+    const authError = await adminAuthError(request, env);
+    if (authError) return authError;
     if (request.method === "GET") return listAdminFiles(env);
     if (request.method === "POST") return uploadFile(request, env);
     return jsonResponse({ error: "Method not allowed." }, 405);
   }
 
-  const adminFileMatch = path.match(/^\/api\/admin\/files\/([a-f0-9]{32})$/);
-  if (adminFileMatch) {
-    if (!env.ACCESS_ISSUER || !env.ACCESS_AUD || !env.ADMIN_EMAILS) {
-      return jsonResponse({ error: "Admin authentication has not been configured." }, 503);
-    }
-    if (!(await verifyAccessRequest(request, env))) return jsonResponse({ error: "Admin access denied." }, 401);
-    if (request.method === "PATCH") return updateFile(adminFileMatch[1], request, env);
-    if (request.method === "DELETE") return deleteFile(adminFileMatch[1], env);
-    return jsonResponse({ error: "Method not allowed." }, 405);
+  const adminActionMatch = path.match(/^\/api\/admin\/files\/([a-f0-9]{32})\/(publish|delete)$/);
+  if (adminActionMatch) {
+    const authError = await adminAuthError(request, env);
+    if (authError) return authError;
+    if (request.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405);
+    if (adminActionMatch[2] === "publish") return updateFile(adminActionMatch[1], request, env);
+    return deleteFile(adminActionMatch[1], env);
   }
 
   return jsonResponse({ error: "Not found." }, 404);
@@ -281,10 +314,18 @@ async function handleRequest(request, env) {
 export default {
   async fetch(request, env) {
     try {
-      return await handleRequest(request, env);
+      if (request.method === "OPTIONS") {
+        return addCorsHeaders(new Response(null, { status: 204 }), request, env);
+      }
+      const response = await handleRequest(request, env);
+      return addCorsHeaders(response, request, env);
     } catch (error) {
       console.error("Hello Cat file service error:", error);
-      return jsonResponse({ error: "The file service encountered an internal error." }, 500);
+      return addCorsHeaders(
+        jsonResponse({ error: "The file service encountered an internal error." }, 500),
+        request,
+        env
+      );
     }
   }
 };

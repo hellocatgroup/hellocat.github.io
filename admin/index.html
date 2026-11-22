@@ -16,7 +16,7 @@
 </head>
 <body class="portal-body">
   <header class="portal-topbar">
-    <a class="portal-brand" href="/" aria-label="Hello Cat home"><img src="../assets/logo.webp" alt=""><span>HELLO CAT</span></a>
+    <a class="portal-brand" href="../" aria-label="Hello Cat home"><img src="../assets/logo.webp" alt=""><span>HELLO CAT</span></a>
     <span class="portal-topbar__tag">ADMINISTRATION</span>
   </header>
   <main class="portal-shell">
@@ -26,6 +26,10 @@
       <p>Upload files and control which ones appear in the public downloads library.</p>
     </section>
     <p class="portal-notice" id="accessNotice" role="status" aria-live="polite">Checking administrator authentication…</p>
+    <div class="portal-auth-actions" id="accessActions" hidden>
+      <a class="portal-button" id="accessLoginLink" href="#">Sign in with Cloudflare Access</a>
+      <p class="portal-help">After signing in, you will be returned here automatically. If you are not on the administrator allowlist, access will be denied.</p>
+    </div>
 
     <div id="adminControls" hidden>
       <section class="portal-card">
@@ -54,8 +58,9 @@
       </section>
     </div>
 
-    <footer class="portal-footer"><a href="/downloads/">View public downloads</a><a href="/">Return to Hello Cat</a></footer>
+    <footer class="portal-footer"><a href="../downloads/">View public downloads</a><a href="../">Return to Hello Cat</a></footer>
   </main>
-  <script src="../js/admin.js?v=2" defer></script>
+  <script src="../js/config.js?v=1" defer></script>
+  <script src="../js/admin.js?v=3" defer></script>
 </body>
 </html>

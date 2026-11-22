@@ -255,3 +255,17 @@ body.portal-body {
 #adminControls[hidden] {
   display: none !important;
 }
+
+.portal-auth-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin: -4px 0 22px;
+}
+.portal-auth-actions[hidden] {
+  display: none !important;
+}
+.portal-auth-actions .portal-help {
+  flex: 1 1 260px;
+}

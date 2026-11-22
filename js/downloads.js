@@ -1,5 +1,6 @@
 (() => {
   const list = document.getElementById("downloadList");
+  const API_BASE_URL = String(window.HC_CONFIG?.apiBaseUrl || "").replace(/\/+$/, "");
 
   function formatBytes(bytes) {
     const value = Number(bytes);
@@ -15,13 +16,18 @@
     return Number.isNaN(date.getTime()) ? "Date unavailable" : date.toLocaleDateString();
   }
 
+  function showMessage(message) {
+    list.replaceChildren();
+    const element = document.createElement("p");
+    element.className = "portal-empty";
+    element.textContent = message;
+    list.appendChild(element);
+  }
+
   function render(files) {
     list.replaceChildren();
     if (!files.length) {
-      const empty = document.createElement("p");
-      empty.className = "portal-empty";
-      empty.textContent = "There are no public downloads available right now.";
-      list.appendChild(empty);
+      showMessage("There are no public downloads available right now.");
       return;
     }
 
@@ -51,7 +57,7 @@
       const download = document.createElement("a");
       download.className = "portal-button";
       download.textContent = "Download";
-      download.href = "/api/files/" + encodeURIComponent(file.id) + "/download";
+      download.href = API_BASE_URL + "/api/files/" + encodeURIComponent(file.id) + "/download";
       download.setAttribute("aria-label", "Download " + file.fileName);
 
       card.append(info, download);
@@ -60,17 +66,21 @@
   }
 
   async function loadDownloads() {
+    if (!API_BASE_URL) {
+      showMessage("The downloads service has not been deployed and connected yet.");
+      return;
+    }
+
     try {
-      const response = await fetch("/api/files", { cache: "no-store" });
+      const response = await fetch(API_BASE_URL + "/api/files", {
+        cache: "no-store",
+        credentials: "omit"
+      });
       if (!response.ok) throw new Error("Download library unavailable.");
       const payload = await response.json();
       render(Array.isArray(payload.files) ? payload.files : []);
     } catch (error) {
-      list.replaceChildren();
-      const message = document.createElement("p");
-      message.className = "portal-empty";
-      message.textContent = "The download library is not available yet. Please try again later.";
-      list.appendChild(message);
+      showMessage("The download library is not available yet. Please try again later.");
       console.error("HC downloads request failed:", error);
     }
   }

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0a0613">
+  <title>HC Admin | Hello Cat</title>
+  <link rel="icon" href="../assets/logo.webp" type="image/webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/reset.css?v=5">
+  <link rel="stylesheet" href="../css/variables.css?v=5">
+  <link rel="stylesheet" href="../css/portal.css?v=2">
+  <script>
+    // If this source file is opened directly on GitHub Pages, use the same-origin
+    // Worker-hosted admin app so Cloudflare Access cookies are first-party.
+    if (window.location.hostname === "hellocatgroup.github.io") {
+      window.location.replace("https://hello-cat-downloads-api.z0ovd.workers.dev/admin/");
+    }
+  </script>
+</head>
+<body class="portal-body">
+  <header class="portal-topbar">
+    <a class="portal-brand" href="../" aria-label="Hello Cat home"><img src="../assets/logo.webp" alt=""><span>HELLO CAT</span></a>
+    <span class="portal-topbar__tag">ADMINISTRATION</span>
+  </header>
+  <main class="portal-shell">
+    <section class="portal-heading">
+      <p class="portal-eyebrow">HELLO CAT / ADMIN</p>
+      <h1>File management</h1>
+      <p>Upload files and control which ones appear in the public downloads library.</p>
+    </section>
+    <p class="portal-notice" id="accessNotice" role="status" aria-live="polite">Checking administrator authentication…</p>
+    <div class="portal-auth-actions" id="accessActions" hidden>
+      <a class="portal-button" id="accessLoginLink" href="#">Sign in with Cloudflare Access</a>
+      <p class="portal-help">After signing in, you will be returned here automatically. If you are not on the administrator allowlist, access will be denied.</p>
+    </div>
+
+    <div id="adminControls" hidden>
+      <section class="portal-card">
+        <div class="portal-card__heading">
+          <div><p class="portal-eyebrow">PUBLISH CONTENT</p><h2>Upload a file</h2></div>
+        </div>
+        <form id="uploadForm" class="portal-form">
+          <label for="fileInput">File</label>
+          <input class="portal-input portal-file-input" id="fileInput" name="file" type="file" required>
+          <label for="descriptionInput">Description <span class="portal-muted">(optional, 500 characters max)</span></label>
+          <textarea class="portal-input" id="descriptionInput" name="description" rows="3" maxlength="500" placeholder="What is this file?"></textarea>
+          <label class="portal-checkbox"><input id="publishImmediately" name="published" type="checkbox" checked><span>Publish immediately after upload</span></label>
+          <div class="portal-form__footer">
+            <button class="portal-button" id="uploadButton" type="submit">Upload file</button>
+            <span class="portal-muted" id="uploadStatus" role="status"></span>
+          </div>
+          <p class="portal-help">Maximum upload size: 90 MiB. Published files are downloadable by anyone with the downloads page URL.</p>
+        </form>
+      </section>
+      <section class="portal-section">
+        <div class="portal-section__heading">
+          <div><p class="portal-eyebrow">LIBRARY</p><h2>Uploaded files</h2></div>
+          <button class="portal-button portal-button--secondary" id="refreshButton" type="button">Refresh</button>
+        </div>
+        <div class="portal-file-list" id="fileList" aria-live="polite"><p class="portal-empty">Loading files…</p></div>
+      </section>
+    </div>
+
+    <footer class="portal-footer"><a href="../downloads/">View public downloads</a><a href="../">Return to Hello Cat</a></footer>
+  </main>
+  <script src="../js/config.js?v=2" defer></script>
+  <script src="../js/admin.js?v=3" defer></script>
+</body>
+</html>

@@ -205,6 +205,70 @@
     }
   }
 
+
+  // Keep the existing one-request upload for smaller files. Send larger files
+  // to R2 through authenticated multipart upload endpoints in 8 MiB pieces.
+  const LEGACY_UPLOAD_LIMIT = 90 * 1024 * 1024;
+  const LARGE_UPLOAD_LIMIT = 512 * 1024 * 1024;
+
+  async function uploadLargeFile(file, description, published) {
+    const start = await request(API_ROOT + "/multipart/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName: file.name, size: file.size })
+    });
+    const prefix = API_ROOT + "/multipart/" + encodeURIComponent(start.id);
+    const chunkSize = Number(start.chunkSize);
+    if (!Number.isSafeInteger(chunkSize) || chunkSize < 5 * 1024 * 1024 ||
+        chunkSize > 8 * 1024 * 1024 || !start.uploadId) {
+      throw new Error("The upload service returned an invalid multipart session.");
+    }
+
+    const parts = [];
+    let completed = false;
+    try {
+      for (let offset = 0, partNumber = 1; offset < file.size; offset += chunkSize, partNumber++) {
+        const end = Math.min(file.size, offset + chunkSize);
+        const part = await request(prefix + "/part?uploadId=" +
+          encodeURIComponent(start.uploadId) + "&partNumber=" + partNumber, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: file.slice(offset, end)
+        });
+        parts.push(part);
+        setStatus(uploadStatus, "Uploading… " + Math.round((end / file.size) * 100) + "%");
+      }
+
+      const result = await request(prefix + "/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uploadId: start.uploadId,
+          parts: parts,
+          fileName: file.name,
+          size: file.size,
+          description: description,
+          published: published
+        })
+      });
+      completed = true;
+      return result;
+    } catch (error) {
+      if (!completed) {
+        try {
+          await request(prefix + "/abort", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uploadId: start.uploadId })
+          });
+        } catch (_cleanupError) {
+          // R2 automatically expires abandoned multipart uploads.
+        }
+      }
+      throw error;
+    }
+  }
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!API_ROOT) {
@@ -216,15 +280,27 @@
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", fileInput.files[0]);
-    formData.append("description", descriptionInput.value.trim());
-    formData.append("published", publishInput.checked ? "true" : "false");
+    const file = fileInput.files[0];
+    if (file.size > LARGE_UPLOAD_LIMIT) {
+      setStatus(uploadStatus, "File exceeds the 512 MiB upload limit.", "error");
+      return;
+    }
+    const description = descriptionInput.value.trim();
+    const published = publishInput.checked;
 
     uploadButton.disabled = true;
     setStatus(uploadStatus, "Uploading…");
     try {
-      const payload = await request(API_ROOT, { method: "POST", body: formData });
+      let payload;
+      if (file.size > LEGACY_UPLOAD_LIMIT) {
+        payload = await uploadLargeFile(file, description, published);
+      } else {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("description", description);
+        formData.append("published", published ? "true" : "false");
+        payload = await request(API_ROOT, { method: "POST", body: formData });
+      }
       form.reset();
       publishInput.checked = true;
       setStatus(uploadStatus, "Uploaded " + payload.file.fileName + ".", "success");

@@ -33,6 +33,8 @@
 .topbar .tabs {
   grid-column: 2;
   justify-self: center;
+  /* Slight visual correction to the left, without changing tab spacing. */
+  transform: translateX(-10px);
 }
 
 .topbar .burger {
@@ -76,6 +78,12 @@
 
 .section-head {
   margin-bottom: 36px;
+}
+
+/* Center the Faces and Discord section headings; leave Store unchanged. */
+#panel-faces > .section-head,
+#panel-discord > .section-head {
+  text-align: center;
 }
 
 .section-head h2 {
